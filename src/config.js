@@ -15,5 +15,6 @@ export const CLOUD_COUNT = 14;
 export const CLOUD_BASE_Y = 58;
 
 // Camera / lighting
-export const FOG_NEAR = 90;
-export const FOG_FAR = 320;
+export const FOG_NEAR = 140;
+export const FOG_FAR = 360;
+export const FOG_COLOR = 0xeaf3fb;

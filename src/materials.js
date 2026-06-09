@@ -12,22 +12,27 @@ waterGeom.rotateX(-Math.PI / 2);
 // generators ({ type: 'grass', ... }), so add a new block type by:
 //   1) adding its material here
 //   2) emitting `{ type: 'newType', ... }` from a feature
+// Colors are picked to look like the Minecraft official site — vivid &
+// saturated, not muddied by lighting. Lambert is fine because we crank ambient
+// up so unlit faces stay readable.
 export const M = {
-  grass:       new THREE.MeshLambertMaterial({ color: 0x5aa64a }),
-  grassDark:   new THREE.MeshLambertMaterial({ color: 0x4a8b3b }),
-  dirt:        new THREE.MeshLambertMaterial({ color: 0x7a5230 }),
-  stone:       new THREE.MeshLambertMaterial({ color: 0x8a8d92 }),
-  stoneDark:   new THREE.MeshLambertMaterial({ color: 0x6e7176 }),
-  snow:        new THREE.MeshLambertMaterial({ color: 0xfafcff }),
-  sand:        new THREE.MeshLambertMaterial({ color: 0xe6d29a }),
-  wood:        new THREE.MeshLambertMaterial({ color: 0x5a3b22 }),
-  leaves:      new THREE.MeshLambertMaterial({ color: 0x3f7a32 }),
-  leavesLight: new THREE.MeshLambertMaterial({ color: 0x4f9a44 }),
-  cloud: new THREE.MeshLambertMaterial({
-    color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false,
+  grass:       new THREE.MeshLambertMaterial({ color: 0x7cc14b }),
+  grassDark:   new THREE.MeshLambertMaterial({ color: 0x6ab241 }),
+  dirt:        new THREE.MeshLambertMaterial({ color: 0xa07242 }),
+  stone:       new THREE.MeshLambertMaterial({ color: 0xb4b6bb }),
+  stoneDark:   new THREE.MeshLambertMaterial({ color: 0x9ea0a5 }),
+  snow:        new THREE.MeshLambertMaterial({ color: 0xfdfefe }),
+  sand:        new THREE.MeshLambertMaterial({ color: 0xeedfa3 }),
+  wood:        new THREE.MeshLambertMaterial({ color: 0x8b5e2e }),
+  leaves:      new THREE.MeshLambertMaterial({ color: 0x55b338 }),
+  leavesLight: new THREE.MeshLambertMaterial({ color: 0x6cc44b }),
+  // Clouds use Basic so they're always pure white — no shading or
+  // hemisphere-tinting can dull them into the "smoke" look.
+  cloud: new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false,
   }),
   water: new THREE.MeshLambertMaterial({
-    color: 0x356fb2, transparent: true, opacity: 0.78,
+    color: 0x4a8be4, transparent: true, opacity: 0.78,
     depthWrite: false, side: THREE.DoubleSide,
   }),
 };

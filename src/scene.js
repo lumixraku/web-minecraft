@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { FOG_NEAR, FOG_FAR } from './config.js';
+import { FOG_NEAR, FOG_FAR, FOG_COLOR } from './config.js';
 
 function createSky() {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      topColor:    { value: new THREE.Color(0x4f9fdc) },
-      midColor:    { value: new THREE.Color(0x9bcaee) },
-      bottomColor: { value: new THREE.Color(0xe2eef8) },
+      topColor:    { value: new THREE.Color(0x4ea3e8) },
+      midColor:    { value: new THREE.Color(0xa4d5f3) },
+      bottomColor: { value: new THREE.Color(0xeaf3fb) },
     },
     vertexShader: `
       varying vec3 vWorld;
@@ -37,7 +37,10 @@ function createSky() {
 }
 
 function createSun() {
-  const sun = new THREE.DirectionalLight(0xfff2d4, 1.1);
+  // Soft warm sun — kept low intensity because ambient does most of the work.
+  // Pushing the sun too hard would darken the unlit faces and bring back the
+  // muddy look we just fixed.
+  const sun = new THREE.DirectionalLight(0xfff6dc, 0.55);
   sun.position.set(70, 120, 50);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -49,6 +52,7 @@ function createSun() {
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 300;
   sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02;
   return sun;
 }
 
@@ -61,7 +65,7 @@ export function createScene(canvas) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xdfeef8, FOG_NEAR, FOG_FAR);
+  scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
   scene.add(createSky());
 
   const camera = new THREE.PerspectiveCamera(
@@ -77,8 +81,11 @@ export function createScene(canvas) {
   controls.minDistance = 12;
   controls.maxDistance = 260;
 
-  scene.add(new THREE.AmbientLight(0x6f8aa8, 0.55));
-  scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x3a4a2a, 0.35));
+  // Bright neutral ambient keeps every face readable in true block color.
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  // Hemisphere is just a gentle tint — sky pale blue from above, warm sand
+  // from below — so block undersides don't go gray-green.
+  scene.add(new THREE.HemisphereLight(0xdfeefc, 0xd8c8a0, 0.35));
 
   const sun = createSun();
   scene.add(sun);
