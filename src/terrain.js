@@ -16,34 +16,37 @@ export function createTerrain() {
   const noiseD = createNoise2D(random);
 
   function heightAt(x, z) {
-    // Soft continent dome — outer edges sink toward water.
+    // Soft continent dome — outer edges sink toward water. Bigger landmass.
     const distFromCenter = Math.sqrt(x * x + z * z) / HALF;
-    const continent = Math.max(0, 1 - distFromCenter * 0.78);
+    const continent = Math.max(0, 1 - distFromCenter * 0.55);
 
-    // Ridged noise gives sharp mountain spines.
+    // Ridged noise gives sharp mountain spines. Square (not cube) so ridges
+    // sit higher more of the time.
     const r = noiseA(x * 0.011, z * 0.011);
-    const ridge = Math.pow(1 - Math.abs(r), 3);
+    const ridge = Math.pow(1 - Math.abs(r), 2);
 
-    // Mountain mask gates where mountains actually appear.
+    // Mountain mask gates where mountains appear — flatter exponent so
+    // mountainous regions are more common.
     const maskRaw = (noiseB(x * 0.0055 + 17, z * 0.0055 - 41) + 1) * 0.5;
-    const mask = Math.pow(maskRaw, 1.4);
-    const mountainHeight = ridge * mask * 48;
+    const mask = Math.pow(maskRaw, 0.9);
+    const mountainHeight = ridge * mask * 60;
 
-    // Secondary higher-frequency peaks add asymmetry.
+    // Secondary higher-frequency peaks add asymmetry on the slopes.
     const r2 = noiseA(x * 0.022 - 88, z * 0.022 + 130);
-    const ridge2 = Math.pow(1 - Math.abs(r2), 4) * mask * 12;
+    const ridge2 = Math.pow(1 - Math.abs(r2), 3) * mask * 16;
 
     // Rolling hills + fine detail.
-    const hills = noiseC(x * 0.028, z * 0.028) * 5.5;
+    const hills = noiseC(x * 0.028, z * 0.028) * 6;
     const detail = noiseD(x * 0.12, z * 0.12) * 1.4;
 
-    // Basin field — strong negative bumps carve out lakes.
+    // Basin field — strong negative bumps carve out lakes, but only where
+    // the noise dips well below zero so lakes don't dominate the map.
     const basinNoise = noiseB(x * 0.017 - 200, z * 0.017 + 350);
-    const basin = basinNoise < -0.05 ? (basinNoise + 0.05) * 26 : 0;
+    const basin = basinNoise < -0.2 ? (basinNoise + 0.2) * 22 : 0;
 
-    let h = 7 + (mountainHeight + ridge2) * continent + hills + detail + basin;
+    let h = 10 + (mountainHeight + ridge2) * continent + hills + detail + basin;
     // Extra dip near borders so water leaks out toward the edges.
-    h -= Math.max(0, distFromCenter - 0.82) * 32;
+    h -= Math.max(0, distFromCenter - 0.85) * 28;
 
     return Math.max(1, Math.floor(h));
   }
