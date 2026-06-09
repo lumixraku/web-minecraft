@@ -6,14 +6,15 @@ import {
   BEACH_BAND,
   MAX_DEPTH,
 } from './config.js';
+import { random } from './random.js';
 
 // Pick a block type given the column surface height and the block's y.
 export function blockTypeAt(surface, y) {
   if (y === surface) {
     if (y <= SEA_LEVEL + BEACH_BAND) return 'sand';
     if (y >= SNOW_LEVEL) return 'snow';
-    if (y >= STONE_EXPOSE) return Math.random() < 0.3 ? 'stoneDark' : 'stone';
-    return Math.random() < 0.25 ? 'grassDark' : 'grass';
+    if (y >= STONE_EXPOSE) return random() < 0.3 ? 'stoneDark' : 'stone';
+    return random() < 0.25 ? 'grassDark' : 'grass';
   }
   if (y === surface - 1) {
     if (surface <= SEA_LEVEL + BEACH_BAND) return 'sand';
@@ -24,7 +25,7 @@ export function blockTypeAt(surface, y) {
     if (surface >= STONE_EXPOSE) return 'stone';
     return 'dirt';
   }
-  return Math.random() < 0.25 ? 'stoneDark' : 'stone';
+  return random() < 0.25 ? 'stoneDark' : 'stone';
 }
 
 // Walks the heightmap and produces every exposed solid block. A "side" block

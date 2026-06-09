@@ -7,16 +7,18 @@ import {
   PLANAR_TYPES,
   TRANSPARENT_TYPES,
 } from './materials.js';
+import { setSeed } from './random.js';
 import { createTerrain } from './terrain.js';
 import { collectSolidBlocks } from './blocks.js';
 import { generateWater } from './features/water.js';
 import { generateTrees } from './features/trees.js';
 import { generateClouds } from './features/clouds.js';
 
-// Build a complete world: terrain, water, trees, clouds. Returns a Group
-// containing one InstancedMesh per block type. The caller adds it to the
-// scene and later passes it to disposeWorld().
-export function buildWorld() {
+// Build a complete world for the given seed: terrain, water, trees, clouds.
+// Returns a Group of InstancedMeshes. Same seed → same world (the PRNG is
+// reseeded here, and every generator consumes random() in a fixed order).
+export function buildWorld(seed) {
+  setSeed(seed);
   const terrain = createTerrain();
 
   const sources = [

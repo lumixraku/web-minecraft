@@ -1,5 +1,6 @@
 import { createNoise2D } from 'simplex-noise';
 import { SIZE, HALF } from './config.js';
+import { random } from './random.js';
 
 // Builds a fresh heightmap using ridged + low-freq mountain mask + hills +
 // detail + negative-basin noise. Returns:
@@ -7,10 +8,12 @@ import { SIZE, HALF } from './config.js';
 //   h(x, z)   : bounds-safe getter (-1 if outside the world)
 //   heightAt  : the raw continuous function, in case caller wants it
 export function createTerrain() {
-  const noiseA = createNoise2D(Math.random);
-  const noiseB = createNoise2D(Math.random);
-  const noiseC = createNoise2D(Math.random);
-  const noiseD = createNoise2D(Math.random);
+  // All 4 noise instances pull from the shared seeded PRNG, so the same
+  // seed always yields the same terrain.
+  const noiseA = createNoise2D(random);
+  const noiseB = createNoise2D(random);
+  const noiseC = createNoise2D(random);
+  const noiseD = createNoise2D(random);
 
   function heightAt(x, z) {
     // Soft continent dome — outer edges sink toward water.

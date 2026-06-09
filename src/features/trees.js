@@ -5,6 +5,7 @@ import {
   STONE_EXPOSE,
   TARGET_TREES,
 } from '../config.js';
+import { random } from '../random.js';
 
 // Scatter trees on grass columns, avoiding sand / bare stone / steep slopes
 // and enforcing a 2-block min spacing. Returns wood + leaf blocks in
@@ -16,8 +17,8 @@ export function generateTrees(heightMap, h) {
   let placed = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS && placed < TARGET_TREES; attempt++) {
-    const tx = 2 + Math.floor(Math.random() * (SIZE - 4));
-    const tz = 2 + Math.floor(Math.random() * (SIZE - 4));
+    const tx = 2 + Math.floor(random() * (SIZE - 4));
+    const tz = 2 + Math.floor(random() * (SIZE - 4));
     const key = tx * SIZE + tz;
     if (occupied.has(key)) continue;
 
@@ -45,7 +46,7 @@ export function generateTrees(heightMap, h) {
     placed++;
 
     // Trunk
-    const trunkH = 4 + Math.floor(Math.random() * 3); // 4..6
+    const trunkH = 4 + Math.floor(random() * 3); // 4..6
     for (let k = 1; k <= trunkH; k++) {
       blocks.push({ x: tx, y: s + k, z: tz, type: 'wood' });
     }
@@ -64,12 +65,12 @@ export function generateTrees(heightMap, h) {
         for (let dz = -r; dz <= r; dz++) {
           if (dx === 0 && dz === 0 && L.dy < 1) continue;
           // round off the corners
-          if (Math.abs(dx) === r && Math.abs(dz) === r && Math.random() < 0.55) continue;
+          if (Math.abs(dx) === r && Math.abs(dz) === r && random() < 0.55) continue;
           blocks.push({
             x: tx + dx,
             y: topY + L.dy,
             z: tz + dz,
-            type: Math.random() < 0.3 ? 'leavesLight' : 'leaves',
+            type: random() < 0.3 ? 'leavesLight' : 'leaves',
           });
         }
       }
