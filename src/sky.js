@@ -219,9 +219,11 @@ export function createSky(scene) {
     out.fogColor.lerp(DUSK, duskF * 0.55);
     const gray = STORM_GRAY.clone().multiplyScalar(0.25 + dayF * 0.75);
     out.fogColor.lerp(gray, storm * 0.7);
+    // Fog only exists to dissolve the chunk-loading edge — keep it as a
+    // steep band near the far limit instead of a wash over the midground.
     scene.fog.color.copy(out.fogColor);
     scene.fog.far = fogBase * weather.fog;
-    scene.fog.near = scene.fog.far * 0.45;
+    scene.fog.near = scene.fog.far * 0.75;
 
     // Water reflection tint — like the fog color but keeps the dusk glow,
     // so sunset paints the lakes orange instead of leaving them dark.

@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { NOISE_GLSL } from './shaders.js';
 
-// Shader water material, shared by every chunk's water mesh (geometry is
-// built per chunk in mesher.js with a per-vertex depth attribute). The
-// vertex shader rolls gentle waves; the fragment shader does analytic wave
-// normals + noise ripples, depth-based color, fresnel sky reflection,
-// sun/moon specular (tight sparkle + broad glitter path) and shoreline
-// foam. Colors arrive via uniforms each frame from the sky/weather state.
+// Calm, painterly shader water (shared by every chunk's water mesh; the
+// geometry carries a per-vertex depth attribute). The look follows the
+// reference illustration: a muted steel-blue surface with soft,
+// large-scale tonal patches that drift very slowly — no foam, no wave
+// stripes, no sparkly noise. Depth tints the color (hazy shallows →
+// deeper, darker water), a gentle fresnel picks up the sky, and a
+// restrained sun/moon glint survives for sunsets. Rain roughens the
+// surface slightly. All colors track the day/night/weather state.
 
 const VERT = /* glsl */ `
   attribute float aDepth;
@@ -15,10 +17,9 @@ const VERT = /* glsl */ `
   varying float vDepth;
   void main() {
     vec3 p = position;
-    float t = uTime * 1.6;
-    p.y += sin(p.x * 0.8 + t) * 0.045
-         + sin(p.z * 1.1 + t * 0.83) * 0.045
-         + sin((p.x + p.z) * 0.45 + t * 0.62) * 0.05;
+    // Barely-there swell — non-axis-aligned so no pattern ever shows
+    p.y += sin(dot(p.xz, vec2(0.43, 0.71)) + uTime * 0.9) * 0.025
+         + sin(dot(p.xz, vec2(-0.61, 0.33)) * 1.3 + uTime * 0.7) * 0.02;
     vW = p;
     vDepth = aDepth;
     gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
@@ -42,46 +43,43 @@ const FRAG = /* glsl */ `
   ${NOISE_GLSL}
 
   void main() {
-    float t = uTime * 1.6;
-    float ndx = cos(vW.x * 0.8 + t) * 0.036
-              + cos((vW.x + vW.z) * 0.45 + t * 0.62) * 0.0225;
-    float ndz = cos(vW.z * 1.1 + t * 0.83) * 0.0495
-              + cos((vW.x + vW.z) * 0.45 + t * 0.62) * 0.0225;
-    vec2 rp = vW.xz * 2.3 + vec2(uTime * 0.4, -uTime * 0.33);
-    float ra = 0.08 + min(uRipple, 1.0) * 0.10;
-    ndx += (vnoise(rp) - 0.5) * ra + (vnoise(rp * 2.7) - 0.5) * ra * 0.6;
-    ndz += (vnoise(rp + 19.7) - 0.5) * ra + (vnoise(rp * 2.7 + 7.3) - 0.5) * ra * 0.6;
-    vec3 n = normalize(vec3(-ndx * 4.0, 1.0, -ndz * 4.0));
+    // Soft tonal patches, large and slow — the painterly surface variation
+    vec2 flow = vec2(uTime * 0.012, uTime * -0.009);
+    vec2 p = vW.xz * 0.035;
+    vec2 warp = vec2(fbm(p * 0.6 + flow), fbm(p * 0.6 - flow.yx + 5.2)) - 0.5;
+    float n = fbm(p + warp * 0.9 + flow * 0.5);
+
+    // Gentle normals from the same field; rain roughens them a touch
+    float ra = 0.10 + min(uRipple, 1.0) * 0.22;
+    vec3 nrm = normalize(vec3(warp.x * ra, 1.0, warp.y * ra));
 
     vec3 V = normalize(cameraPosition - vW);
-    float fres = pow(1.0 - max(dot(V, n), 0.0), 3.0);
+    float fres = pow(1.0 - max(dot(V, nrm), 0.0), 3.0);
 
     float dT = clamp(vDepth / 6.0, 0.0, 1.0);
-    vec3 base = mix(uShallow, uDeep, dT);
-    vec3 col = mix(base, uSkyCol, clamp(fres * 0.85 + 0.08, 0.0, 1.0));
+    vec3 col = mix(uShallow, uDeep, dT);
+    // Tonal drift: ±5% brightness in soft blotches
+    col *= 0.95 + n * 0.10;
+    col = mix(col, uSkyCol, clamp(fres * 0.75 + 0.05, 0.0, 1.0));
 
+    // Restrained sun / moon glint (keeps the sunset path, never glittery)
     vec3 H = normalize(uLightDir + V);
-    float ndh = max(dot(n, H), 0.0);
-    col += uLightCol * (pow(ndh, 160.0) * 1.6 + pow(ndh, 14.0) * 0.22);
+    float ndh = max(dot(nrm, H), 0.0);
+    col += uLightCol * (pow(ndh, 140.0) * 0.5 + pow(ndh, 14.0) * 0.12);
 
-    float foamBand = 1.0 - smoothstep(0.0, 1.3, vDepth);
-    float fn = vnoise(vW.xz * 2.0 + uTime * 0.5)
-             * vnoise(vW.xz * 3.7 - uTime * 0.4);
-    float foam = smoothstep(0.18, 0.42, fn * foamBand * 1.6);
-    col += uSkyCol * 1.15 * foam;
-
-    float alpha = mix(0.62, 0.88, dT) + fres * 0.08 + foam * 0.2;
+    float alpha = mix(0.60, 0.86, dT) + fres * 0.06;
 
     float fd = length(cameraPosition - vW);
     float ff = smoothstep(uFogNear, uFogFar, fd);
     col = mix(col, uFogColor, ff);
 
-    gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.95));
+    gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.93));
   }
 `;
 
-const DEEP = new THREE.Color(0.08, 0.28, 0.58);
-const SHALLOW = new THREE.Color(0.20, 0.62, 0.72);
+// Muted steel blues, like the reference illustration
+const DEEP = new THREE.Color(0.15, 0.27, 0.39);
+const SHALLOW = new THREE.Color(0.33, 0.50, 0.58);
 
 export function createWaterMaterial() {
   const uniforms = {
@@ -109,7 +107,7 @@ export function createWaterMaterial() {
     uniforms.uLightDir.value.copy(sky.out.lightDir);
     uniforms.uLightCol.value.copy(sky.out.lightCol);
     uniforms.uSkyCol.value.copy(sky.out.reflectCol);
-    const dim = 0.10 + 0.90 * sky.out.dayF * (1 - weather.gloom * 0.5);
+    const dim = 0.12 + 0.88 * sky.out.dayF * (1 - weather.gloom * 0.5);
     uniforms.uDeep.value.copy(DEEP).multiplyScalar(dim);
     uniforms.uShallow.value.copy(SHALLOW).multiplyScalar(dim);
     uniforms.uRipple.value = weather.rain;
