@@ -44,24 +44,28 @@ const FRAG = /* glsl */ `
     vec3 night = mix(nightHor, nightTop, pow(t, 0.6));
     vec3 col = mix(night, day, uDayF);
 
-    // Dusk glow — strongest around the sun azimuth, hugging the horizon
+    // Dusk gradient (reference palette): a banded wash over the whole sky —
+    // red-orange horizon line → amber band → vivid magenta → deep violet
+    // zenith. uDuskF drives how much of it replaces the day/night base.
     float sunAmount = max(dot(d, uSunDir), 0.0);
-    vec3 duskCol = vec3(1.0, 0.45, 0.18);
-    col = mix(col, duskCol, uDuskF * pow(sunAmount, 3.0) * (1.0 - abs(h)));
-    col += duskCol * uDuskF * pow(max(1.0 - abs(h), 0.0), 6.0) * 0.35;
-
-    // Twilight wash — the whole lower sky soaks in warm haze while the
-    // zenith stays dark, with a magenta band in between (the reference
-    // look: dusk fills the sky, not just the sun's corner)
-    vec3 duskMid = vec3(0.46, 0.22, 0.26);
-    float wash = uDuskF * pow(clamp(1.0 - h, 0.0, 1.0), 1.9);
-    col = mix(col, duskCol * 0.50 + duskMid * 0.50, wash * 0.50);
-    col = mix(col, duskMid, uDuskF * pow(clamp(1.0 - abs(h - 0.25), 0.0, 1.0), 5.0) * 0.30);
+    vec3 duskCol = vec3(1.0, 0.42, 0.12);
+    vec3 duskRed = vec3(0.80, 0.14, 0.05);
+    vec3 duskAmb = vec3(1.00, 0.58, 0.10);
+    vec3 duskMag = vec3(0.80, 0.10, 0.32);
+    vec3 duskZen = vec3(0.17, 0.05, 0.24);
+    vec3 sunset = mix(duskRed, duskAmb, smoothstep(0.0, 0.09, h));
+    sunset = mix(sunset, duskMag, smoothstep(0.10, 0.42, h));
+    sunset = mix(sunset, duskZen, smoothstep(0.42, 0.88, h));
+    // The gradient fills the sky, a touch stronger toward the sun's side
+    float fill = uDuskF * (0.72 + 0.28 * pow(sunAmount, 2.0));
+    col = mix(col, sunset, clamp(fill, 0.0, 1.0) * 0.92);
+    // Extra glow hugging the horizon around the sun
+    col += duskCol * uDuskF * pow(sunAmount, 3.0) * pow(max(1.0 - abs(h), 0.0), 5.0) * 0.45;
 
     // Sun disc + glow
     float sunDisc = smoothstep(0.99955, 0.99985, sunAmount);
     float sunGlow = pow(sunAmount, 180.0) * 0.5 + pow(sunAmount, 12.0) * 0.12;
-    vec3 sunCol = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.55, 0.25), uDuskF);
+    vec3 sunCol = mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.45, 0.15), uDuskF);
     col += (sunDisc * 1.6 + sunGlow) * sunCol * (0.25 + uDayF) * (1.0 - uStorm * 0.85);
 
     // Moon disc (with a crescent bite) + glow
@@ -102,9 +106,9 @@ function smoothstepJS(a, b, x) {
 
 const DAY_HOR = new THREE.Color(0.835, 0.910, 0.970);
 const NIGHT_HOR = new THREE.Color(0.050, 0.070, 0.140);
-const DUSK = new THREE.Color(1.0, 0.45, 0.18);
+const DUSK = new THREE.Color(0.95, 0.36, 0.10);
 const SUN_WARM = new THREE.Color(1.0, 0.93, 0.78);
-const SUN_DUSK = new THREE.Color(1.0, 0.55, 0.25);
+const SUN_DUSK = new THREE.Color(1.0, 0.45, 0.15);
 const MOON_COL = new THREE.Color(0.55, 0.65, 0.95);
 const STORM_GRAY = new THREE.Color(0.25, 0.27, 0.30);
 
@@ -216,7 +220,7 @@ export function createSky(scene) {
     // Aerial perspective: distant terrain melts into the twilight, so the
     // dusk component is strong (matches the sky's lower-hemisphere wash)
     out.fogColor.copy(NIGHT_HOR).lerp(DAY_HOR, dayF);
-    out.fogColor.lerp(DUSK, duskF * 0.55);
+    out.fogColor.lerp(DUSK, duskF * 0.65);
     const gray = STORM_GRAY.clone().multiplyScalar(0.25 + dayF * 0.75);
     out.fogColor.lerp(gray, storm * 0.7);
     // Fog only exists to dissolve the chunk-loading edge — keep it as a

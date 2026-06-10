@@ -5,11 +5,11 @@ no bundler, no build step, just ES modules and an import map. A continent-scale
 world streams in around you chunk by chunk, with a full day/night cycle,
 dynamic weather, and shader-driven sky, clouds and water.
 
-![Day](docs/screenshots/day.png)
+![Sunset](docs/screenshots/sunset.jpg)
 
 | | |
 | --- | --- |
-| ![Sunset](docs/screenshots/sunset.png) | ![Night](docs/screenshots/night.png) |
+| ![Day](docs/screenshots/day.jpg) | ![Night](docs/screenshots/night.jpg) |
 
 ```sh
 python3 -m http.server 8765   # then open http://localhost:8765
@@ -164,8 +164,9 @@ instead of washing out the midground.
 
 A single shader-dome inside-out sphere, driven by one `timeOfDay` value (a full
 cycle is 4 minutes). The fragment shader composites, back to front: a day/night
-vertical gradient blended by sun elevation; a warm dusk wash over the lower
-hemisphere; analytic **sun and moon discs** (the moon gets a crescent bite by
+vertical gradient blended by sun elevation; a banded **sunset gradient** that
+washes over the whole sky at dusk (red-orange horizon line → amber band →
+vivid magenta → deep violet zenith); analytic **sun and moon discs** (the moon gets a crescent bite by
 subtracting an offset disc) with glows; and hash-based **twinkling stars** on a
 slowly-rotating sky direction that fade in as the sun sets. One
 shadow-casting directional light tracks the sun by day and the moon by night,
