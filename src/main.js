@@ -12,6 +12,7 @@ import { createPlayer } from './player.js';
 import { createInteraction } from './interact.js';
 import { createHud } from './hud.js';
 import { createConsole } from './console.js';
+import { createDebug } from './debug.js';
 
 const canvas = document.getElementById('app');
 const loading = document.getElementById('loading');
@@ -26,6 +27,7 @@ const player = createPlayer(camera);
 
 let world = null;
 const interact = createInteraction(scene, camera, player, hud, () => world);
+const debug = createDebug({ camera, player, getWorld: () => world, interact });
 
 function lockPointer() {
   // May be rejected (e.g. right after ESC there's a browser cooldown) —
@@ -148,6 +150,11 @@ document.addEventListener('keydown', (e) => {
     gameConsole.show();
     return;
   }
+  if (e.code === 'F3') {
+    e.preventDefault(); // browsers bind F3 to find-in-page
+    debug.toggle();
+    return;
+  }
   if (e.code === 'KeyR') weather.cycle();
   if (e.code === 'KeyT') sky.setTimeScale(40);
 });
@@ -157,7 +164,7 @@ document.addEventListener('keyup', (e) => {
 
 // Debug / test hooks (used by automated checks; harmless to ship)
 window.__game = {
-  scene, camera, sky, weather, player,
+  scene, camera, sky, weather, player, debug,
   console: gameConsole,
   get world() { return world; },
 };
@@ -197,6 +204,7 @@ function tick() {
 
     hud.setStatus(sky.timeOfDay, w.name);
   }
+  debug.update(dt);
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);

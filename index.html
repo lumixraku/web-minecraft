@@ -97,6 +97,21 @@
       text-shadow: 1px 1px 0 #000;
     }
 
+    /* F3 debug overlay, top left */
+    #debug {
+      position: fixed; top: 12px; left: 12px;
+      display: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px; line-height: 1.5;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 8px 10px;
+      white-space: pre;
+      pointer-events: none;
+      z-index: 40;
+    }
+    body.menu-open #debug { display: none !important; }
+
     /* Time + weather, top right */
     #status {
       position: fixed; top: 12px; right: 12px;
@@ -310,11 +325,12 @@
 
   <div id="hud">
     WASD move · Space jump · Space×2 fly · Shift sprint · / commands<br>
-    L-click dig · R-click place · R weather · T fast time · ESC menu
+    L-click dig · R-click place · R weather · T fast time · F3 debug · ESC menu
   </div>
   <div id="crosshair"></div>
   <div id="hotbar"></div>
   <div id="status"></div>
+  <div id="debug"></div>
   <div id="underwater"></div>
   <div id="console">
     <div id="console-log"></div>

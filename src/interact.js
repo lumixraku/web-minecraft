@@ -98,5 +98,5 @@ export function createInteraction(scene, camera, player, hud, getWorld) {
   });
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  return { update };
+  return { update, getTarget: () => target };
 }
