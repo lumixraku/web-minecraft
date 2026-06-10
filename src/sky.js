@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DAY_LENGTH, FOG_NEAR, FOG_FAR } from './config.js';
+import { DAY_LENGTH, RENDER_DIST, CHUNK } from './config.js';
 
 // Sky + lighting rig: a shader dome (gradient sky, sun & moon discs, dusk
 // glow, stars, storm darkening, lightning flash) plus the scene lights that
@@ -139,7 +139,7 @@ export function createSky(scene) {
   dirLight.shadow.normalBias = 0.02;
   scene.add(dirLight, dirLight.target);
 
-  scene.fog = new THREE.Fog(0xeaf3fb, FOG_NEAR, FOG_FAR);
+  scene.fog = new THREE.Fog(0xeaf3fb, 60, RENDER_DIST * CHUNK);
 
   let timeOfDay = 0.3;  // 0 midnight, 0.5 noon — start mid-morning
   let timeScale = 1;
@@ -159,7 +159,9 @@ export function createSky(scene) {
     flash: 0,
   };
 
-  function update(dt, weather, camera) {
+  // fogBase: clear-weather fog distance — tracks the world's render
+  // distance so the chunk edge always hides inside the haze.
+  function update(dt, weather, camera, fogBase = RENDER_DIST * CHUNK) {
     elapsed += dt;
     timeOfDay = (timeOfDay + (dt * timeScale) / DAY_LENGTH) % 1;
 
@@ -182,16 +184,18 @@ export function createSky(scene) {
 
     // --- lights ---
     const sunI = smoothstepJS(0, 0.22, e);
+    // Shadow rig follows the player so shadows exist everywhere in the
+    // infinite world (the shadow camera box is ±110 around the target).
+    dirLight.target.position.set(camera.position.x, 10, camera.position.z);
     if (e > 0) {
-      dirLight.position.copy(sunDir).multiplyScalar(180);
+      dirLight.position.copy(sunDir).multiplyScalar(180).add(dirLight.target.position);
       dirLight.color.copy(SUN_WARM).lerp(SUN_DUSK, duskF);
       dirLight.intensity = (0.15 + 0.55 * sunI) * (1 - storm * 0.75);
     } else {
-      dirLight.position.copy(uniforms.uMoonDir.value).multiplyScalar(180);
+      dirLight.position.copy(uniforms.uMoonDir.value).multiplyScalar(180).add(dirLight.target.position);
       dirLight.color.copy(MOON_COL);
       dirLight.intensity = 0.22 * smoothstepJS(0, 0.2, -e) * (1 - storm * 0.8);
     }
-    dirLight.target.position.set(0, 10, 0);
     dirLight.target.updateMatrixWorld();
 
     ambient.intensity = (0.18 + 0.68 * dayF) * (1 - storm * 0.35) + weather.flash * 1.4;
@@ -203,8 +207,8 @@ export function createSky(scene) {
     const gray = STORM_GRAY.clone().multiplyScalar(0.25 + dayF * 0.75);
     out.fogColor.lerp(gray, storm * 0.7);
     scene.fog.color.copy(out.fogColor);
-    scene.fog.near = FOG_NEAR * weather.fog;
-    scene.fog.far = FOG_FAR * weather.fog;
+    scene.fog.far = fogBase * weather.fog;
+    scene.fog.near = scene.fog.far * 0.45;
 
     // Water reflection tint — like the fog color but keeps the dusk glow,
     // so sunset paints the lakes orange instead of leaving them dark.

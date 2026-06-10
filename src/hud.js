@@ -1,4 +1,4 @@
-import { BLOCK_IDS } from './voxels.js';
+import { BLOCK_IDS } from './blocks.js';
 import { blockColor } from './materials.js';
 
 // In-game HUD: hotbar (block palette), crosshair (pure CSS), and the
@@ -20,7 +20,7 @@ export function createHud() {
     slot.className = 'slot';
     const swatch = document.createElement('div');
     swatch.className = 'swatch';
-    swatch.style.background = '#' + blockColor(type).getHexString();
+    swatch.style.background = '#' + blockColor(BLOCK_IDS[type]).getHexString();
     slot.appendChild(swatch);
     const num = document.createElement('span');
     num.className = 'num';

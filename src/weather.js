@@ -13,10 +13,10 @@ import * as THREE from 'three';
 
 const PRESETS = {
   clear:  { cover: 0.22, gloom: 0.00, fog: 1.00, rain: 0.0, snow: 0, thunder: 0 },
-  cloudy: { cover: 0.60, gloom: 0.18, fog: 0.80, rain: 0.0, snow: 0, thunder: 0 },
-  rain:   { cover: 0.85, gloom: 0.45, fog: 0.50, rain: 1.0, snow: 0, thunder: 0 },
-  storm:  { cover: 1.00, gloom: 0.70, fog: 0.38, rain: 1.6, snow: 0, thunder: 1 },
-  snow:   { cover: 0.80, gloom: 0.30, fog: 0.45, rain: 0.0, snow: 1, thunder: 0 },
+  cloudy: { cover: 0.60, gloom: 0.18, fog: 0.85, rain: 0.0, snow: 0, thunder: 0 },
+  rain:   { cover: 0.85, gloom: 0.45, fog: 0.60, rain: 1.0, snow: 0, thunder: 0 },
+  storm:  { cover: 1.00, gloom: 0.70, fog: 0.45, rain: 1.6, snow: 0, thunder: 1 },
+  snow:   { cover: 0.80, gloom: 0.30, fog: 0.55, rain: 0.0, snow: 1, thunder: 0 },
 };
 const ORDER = ['clear', 'cloudy', 'rain', 'storm', 'snow'];
 const WEIGHTS = { clear: 0.32, cloudy: 0.24, rain: 0.18, storm: 0.10, snow: 0.16 };
@@ -100,6 +100,7 @@ export function createWeather(scene) {
   scene.add(rainFx.points, snowFx.points);
 
   let stateName = 'clear';
+  let locked = false;  // /weather lock — suspend auto-cycling
   const cur = { ...PRESETS.clear };
   let nextChange = 45 + Math.random() * 45;
   let boltTimer = 6;
@@ -127,7 +128,7 @@ export function createWeather(scene) {
   function update(dt, camera, dayF) {
     elapsed += dt;
     nextChange -= dt;
-    if (nextChange <= 0) setState(pickNext());
+    if (nextChange <= 0 && !locked) setState(pickNext());
 
     // Ease parameters toward the active preset
     const target = PRESETS[stateName];
@@ -163,5 +164,12 @@ export function createWeather(scene) {
     };
   }
 
-  return { update, cycle, setState, get state() { return stateName; } };
+  return {
+    update, cycle, setState,
+    get state() { return stateName; },
+    get locked() { return locked; },
+    setLocked(v) { locked = v; },
+    isValidState: (name) => name in PRESETS,
+    states: Object.keys(PRESETS),
+  };
 }

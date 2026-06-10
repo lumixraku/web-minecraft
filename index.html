@@ -115,6 +115,42 @@
       pointer-events: none;
     }
 
+    /* Command console (press / in game) */
+    #console {
+      position: fixed; left: 12px; bottom: 64px;
+      width: min(560px, 70vw);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      z-index: 50;
+    }
+    body.menu-open #console { display: none; }
+    #console-log .console-line {
+      color: #fff;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 3px 8px;
+      margin-top: 2px;
+      text-shadow: 1px 1px 0 #000;
+      transition: opacity 1.2s;
+      width: fit-content;
+      max-width: 100%;
+    }
+    #console-log .console-line.error { color: #ff7a7a; }
+    #console-log .console-line.faded { opacity: 0; }
+    #console.open #console-log .console-line { opacity: 1; }
+    #console-input {
+      display: none;
+      width: 100%;
+      margin-top: 4px;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      outline: none;
+      font: inherit;
+    }
+    #console.open #console-input { display: block; }
+
     /* Loading splash */
     #loading {
       position: fixed; inset: 0; display: none;
@@ -273,13 +309,17 @@
   <canvas id="app"></canvas>
 
   <div id="hud">
-    WASD move · Space jump · Shift sprint · F fly<br>
+    WASD move · Space jump · Space×2 fly · Shift sprint · / commands<br>
     L-click dig · R-click place · R weather · T fast time · ESC menu
   </div>
   <div id="crosshair"></div>
   <div id="hotbar"></div>
   <div id="status"></div>
   <div id="underwater"></div>
+  <div id="console">
+    <div id="console-log"></div>
+    <input id="console-input" autocomplete="off" spellcheck="false" />
+  </div>
 
   <div id="loading">GENERATING TERRAIN…</div>
 

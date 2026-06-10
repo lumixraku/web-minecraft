@@ -1,17 +1,16 @@
 import * as THREE from 'three';
-import { HALF, WORLD_HEIGHT, REACH } from './config.js';
-import { AIR } from './voxels.js';
+import { WORLD_HEIGHT, REACH } from './config.js';
+import { AIR } from './blocks.js';
 
 // Block targeting + break/place. A DDA voxel raycast (Amanatides & Woo)
 // walks the grid from the camera along the view direction; the hit voxel is
 // outlined, left-click clears it, right-click places the hotbar block in the
-// cell in front of the hit face.
+// cell in front of the hit face. Voxel coords ARE world coords (floored).
 
-// origin/dir in world space; returns grid coords + hit face normal, or null.
-export function raycastVoxel(vox, origin, dir, maxDist) {
-  let x = Math.floor(origin.x + HALF);
+export function raycastVoxel(world, origin, dir, maxDist) {
+  let x = Math.floor(origin.x);
   let y = Math.floor(origin.y);
-  let z = Math.floor(origin.z + HALF);
+  let z = Math.floor(origin.z);
 
   const stepX = dir.x > 0 ? 1 : -1;
   const stepY = dir.y > 0 ? 1 : -1;
@@ -20,14 +19,13 @@ export function raycastVoxel(vox, origin, dir, maxDist) {
   const tDeltaY = dir.y !== 0 ? Math.abs(1 / dir.y) : Infinity;
   const tDeltaZ = dir.z !== 0 ? Math.abs(1 / dir.z) : Infinity;
 
-  const ox = origin.x + HALF, oy = origin.y, oz = origin.z + HALF;
-  let tMaxX = dir.x !== 0 ? (stepX > 0 ? x + 1 - ox : ox - x) * tDeltaX : Infinity;
-  let tMaxY = dir.y !== 0 ? (stepY > 0 ? y + 1 - oy : oy - y) * tDeltaY : Infinity;
-  let tMaxZ = dir.z !== 0 ? (stepZ > 0 ? z + 1 - oz : oz - z) * tDeltaZ : Infinity;
+  let tMaxX = dir.x !== 0 ? (stepX > 0 ? x + 1 - origin.x : origin.x - x) * tDeltaX : Infinity;
+  let tMaxY = dir.y !== 0 ? (stepY > 0 ? y + 1 - origin.y : origin.y - y) * tDeltaY : Infinity;
+  let tMaxZ = dir.z !== 0 ? (stepZ > 0 ? z + 1 - origin.z : origin.z - z) * tDeltaZ : Infinity;
 
   let nx = 0, ny = 0, nz = 0;
   for (let i = 0; i < 256; i++) {
-    if (vox.get(x, y, z) !== AIR) return { x, y, z, nx, ny, nz };
+    if (world.get(x, y, z) !== AIR) return { x, y, z, nx, ny, nz };
     if (tMaxX < tMaxY && tMaxX < tMaxZ) {
       if (tMaxX > maxDist) return null;
       x += stepX; tMaxX += tDeltaX; nx = -stepX; ny = 0; nz = 0;
@@ -62,13 +60,9 @@ export function createInteraction(scene, camera, player, hud, getWorld) {
       return;
     }
     camera.getWorldDirection(dir);
-    target = raycastVoxel(world.vox, camera.position, dir, REACH);
+    target = raycastVoxel(world, camera.position, dir, REACH);
     if (target) {
-      highlight.position.set(
-        target.x - HALF + 0.5,
-        target.y + 0.5,
-        target.z - HALF + 0.5,
-      );
+      highlight.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
       highlight.visible = true;
     } else {
       highlight.visible = false;
@@ -80,27 +74,26 @@ export function createInteraction(scene, camera, player, hud, getWorld) {
     if (!world || document.pointerLockElement === null || !target) return;
 
     if (e.button === 0) {
-      world.vox.set(target.x, target.y, target.z, AIR);
-      world.chunks.rebuildAt(target.x, target.z);
+      world.set(target.x, target.y, target.z, AIR);
+      world.remeshAt(target.x, target.z);
     } else if (e.button === 2) {
       const px = target.x + target.nx;
       const py = target.y + target.ny;
       const pz = target.z + target.nz;
       if (target.nx === 0 && target.ny === 0 && target.nz === 0) return;
       if (py < 0 || py >= WORLD_HEIGHT) return;
-      if (world.vox.get(px, py, pz) !== AIR) return;
+      if (world.get(px, py, pz) !== AIR) return;
 
       // Don't place a block inside the player
       const bb = player.getAABB();
-      const wx = px - HALF, wz = pz - HALF;
       const overlaps =
-        bb.maxX > wx && bb.minX < wx + 1 &&
+        bb.maxX > px && bb.minX < px + 1 &&
         bb.maxY > py && bb.minY < py + 1 &&
-        bb.maxZ > wz && bb.minZ < wz + 1;
+        bb.maxZ > pz && bb.minZ < pz + 1;
       if (overlaps) return;
 
-      world.vox.set(px, py, pz, hud.selectedId());
-      world.chunks.rebuildAt(px, pz);
+      world.set(px, py, pz, hud.selectedId());
+      world.remeshAt(px, pz);
     }
   });
   document.addEventListener('contextmenu', (e) => e.preventDefault());

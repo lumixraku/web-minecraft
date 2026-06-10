@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CHUNK } from './config.js';
 import { createScene } from './scene.js';
 import { createWorld } from './world.js';
 import { loadWorld, saveWorld } from './storage.js';
@@ -10,6 +11,7 @@ import { createWeather } from './weather.js';
 import { createPlayer } from './player.js';
 import { createInteraction } from './interact.js';
 import { createHud } from './hud.js';
+import { createConsole } from './console.js';
 
 const canvas = document.getElementById('app');
 const loading = document.getElementById('loading');
@@ -25,23 +27,6 @@ const player = createPlayer(camera);
 let world = null;
 const interact = createInteraction(scene, camera, player, hud, () => world);
 
-function generateForSeed(seed) {
-  loading.style.display = 'flex';
-  // Defer one frame so the loading screen paints before we block the main
-  // thread filling the voxel field + meshing all chunks.
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      if (world) world.dispose();
-      world = createWorld(seed);
-      scene.add(world.group);
-      player.setWorld(world);
-      player.spawn(world.spawn);
-      loading.style.display = 'none';
-      resolve();
-    });
-  });
-}
-
 function lockPointer() {
   // May be rejected (e.g. right after ESC there's a browser cooldown) —
   // the user can always click the canvas to capture the mouse again.
@@ -49,6 +34,30 @@ function lockPointer() {
     const p = canvas.requestPointerLock();
     if (p && p.catch) p.catch(() => {});
   } catch { /* ignore */ }
+}
+
+const gameConsole = createConsole({
+  sky, weather, player,
+  getWorld: () => world,
+  requestLock: lockPointer,
+});
+
+function generateForSeed(seed) {
+  loading.style.display = 'flex';
+  // Defer one frame so the loading screen paints before the synchronous
+  // pre-generation of the chunks around spawn.
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      if (world) world.dispose();
+      world = createWorld(seed, scene);
+      const spawn = world.findSpawn();
+      world.pregenerate(spawn.x, spawn.z);
+      player.setWorld(world);
+      player.spawn(spawn);
+      loading.style.display = 'none';
+      resolve();
+    });
+  });
 }
 
 const menu = createMenu({
@@ -77,11 +86,11 @@ menu.show();
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
   player.setEnabled(locked);
-  // ESC released the pointer → bring up the menu (Minecraft behavior)
-  if (!locked && world && !menu.isVisible()) menu.show();
+  // ESC released the pointer → menu (unless the command console took it)
+  if (!locked && world && !menu.isVisible() && !gameConsole.isOpen()) menu.show();
 });
 canvas.addEventListener('click', () => {
-  if (world && !menu.isVisible()) lockPointer();
+  if (world && !menu.isVisible() && !gameConsole.isOpen()) lockPointer();
 });
 
 document.addEventListener('keydown', (e) => {
@@ -90,16 +99,25 @@ document.addEventListener('keydown', (e) => {
     lockPointer();
     return;
   }
-  if (!world || menu.isVisible()) return;
+  if (!world || menu.isVisible() || gameConsole.isOpen()) return;
+  if (e.key === '/') {
+    e.preventDefault();
+    gameConsole.show();
+    return;
+  }
   if (e.code === 'KeyR') weather.cycle();
   if (e.code === 'KeyT') sky.setTimeScale(40);
 });
 document.addEventListener('keyup', (e) => {
-  if (e.code === 'KeyT') sky.setTimeScale(1);
+  if (e.code === 'KeyT' && !gameConsole.isOpen()) sky.setTimeScale(1);
 });
 
 // Debug / test hooks (used by automated checks; harmless to ship)
-window.__game = { scene, camera, sky, weather, player, get world() { return world; } };
+window.__game = {
+  scene, camera, sky, weather, player,
+  console: gameConsole,
+  get world() { return world; },
+};
 
 const clock = new THREE.Clock();
 
@@ -108,9 +126,20 @@ function tick() {
 
   player.update(dt);
   const w = weather.update(dt, camera, sky.out.dayF);
-  sky.update(dt, w, camera);
-  clouds.update(dt, w, sky, camera);
+  let fogBase;
   if (world) {
+    fogBase = world.renderDist * CHUNK;
+    // Creative flight: the higher you climb, the further the fog opens up,
+    // so flying high gives an aerial vista instead of a wall of haze.
+    const alt = Math.max(0, camera.position.y - 50);
+    fogBase *= 1 + Math.min(1, alt / 80) * 1.8;
+  }
+  sky.update(dt, w, camera, fogBase);
+  clouds.update(dt, w, sky, camera);
+
+  if (world) {
+    // Stream chunks toward the player
+    world.update(player.position.x, player.position.z);
     world.water.update(dt, w, sky, scene);
     interact.update();
 
