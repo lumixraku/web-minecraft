@@ -1,56 +1,49 @@
 import {
-  SIZE,
   SEA_LEVEL,
   SNOW_LEVEL,
   STONE_EXPOSE,
   BEACH_BAND,
-  MAX_DEPTH,
 } from './config.js';
-import { random } from './random.js';
 
-// Pick a block type given the column surface height and the block's y.
-export function blockTypeAt(surface, y) {
-  if (y === surface) {
-    if (y <= SEA_LEVEL + BEACH_BAND) return 'sand';
-    if (y >= SNOW_LEVEL) return 'snow';
-    if (y >= STONE_EXPOSE) return random() < 0.3 ? 'stoneDark' : 'stone';
-    return random() < 0.25 ? 'grassDark' : 'grass';
-  }
-  if (y === surface - 1) {
-    if (surface <= SEA_LEVEL + BEACH_BAND) return 'sand';
-    if (surface >= STONE_EXPOSE) return 'stone';
-    return 'dirt';
-  }
-  if (y >= surface - 3) {
-    if (surface >= STONE_EXPOSE) return 'stone';
-    return 'dirt';
-  }
-  return random() < 0.25 ? 'stoneDark' : 'stone';
+export const AIR = 0;
+export const BLOCK_IDS = {
+  grass: 1, grassDark: 2, dirt: 3, stone: 4, stoneDark: 5,
+  snow: 6, sand: 7, wood: 8, leaves: 9, leavesLight: 10,
+};
+export const ID_TO_TYPE = [
+  null, 'grass', 'grassDark', 'dirt', 'stone', 'stoneDark',
+  'snow', 'sand', 'wood', 'leaves', 'leavesLight',
+];
+
+// Deterministic per-coordinate hash — used for color variants, tree rolls
+// and leaf raggedness so generation is stable across re-meshing and
+// independent of chunk visit order.
+export function hash3(x, y, z) {
+  let h = (x * 374761393 + y * 668265263 + z * 1442695041) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// Walks the heightmap and produces every exposed solid block. A "side" block
-// is only emitted if a neighbor column is lower (or off-world) so we don't
-// generate buried blocks no one will ever see.
-//   heightMap : Int16Array indexed `x * SIZE + z`
-//   h(x, z)   : bounds-safe getter (-1 outside world)
-// Returns: Array<{ x, y, z, type }>
-export function collectSolidBlocks(heightMap, h) {
-  const blocks = [];
-  for (let x = 0; x < SIZE; x++) {
-    for (let z = 0; z < SIZE; z++) {
-      const s = heightMap[x * SIZE + z];
-
-      // Top of column — always rendered.
-      blocks.push({ x, y: s, z, type: blockTypeAt(s, s) });
-
-      const n = Math.min(h(x + 1, z), h(x - 1, z), h(x, z + 1), h(x, z - 1));
-      // If any neighbor is off-world, expose this column's sides to MAX_DEPTH.
-      const neighborMin = n < 0 ? s - MAX_DEPTH : n;
-      const bottom = Math.max(0, Math.max(neighborMin, s - MAX_DEPTH));
-      for (let y = s - 1; y > bottom; y--) {
-        blocks.push({ x, y, z, type: blockTypeAt(s, y) });
-      }
-    }
+// Pick a block id from the column surface height and the cell's y.
+export function blockIdAt(surface, y, x, z) {
+  // Thick snow pack above the snow line, so steep slopes read white too
+  if (surface >= SNOW_LEVEL && y >= surface - 2 && y <= surface) {
+    return BLOCK_IDS.snow;
   }
-  return blocks;
+  if (y === surface) {
+    if (y <= SEA_LEVEL + BEACH_BAND) return BLOCK_IDS.sand;
+    if (y >= STONE_EXPOSE) {
+      return hash3(x, y, z) < 0.3 ? BLOCK_IDS.stoneDark : BLOCK_IDS.stone;
+    }
+    return hash3(x, y, z) < 0.25 ? BLOCK_IDS.grassDark : BLOCK_IDS.grass;
+  }
+  if (y === surface - 1) {
+    if (surface <= SEA_LEVEL + BEACH_BAND) return BLOCK_IDS.sand;
+    if (surface >= STONE_EXPOSE) return BLOCK_IDS.stone;
+    return BLOCK_IDS.dirt;
+  }
+  if (y >= surface - 3) {
+    return surface >= STONE_EXPOSE ? BLOCK_IDS.stone : BLOCK_IDS.dirt;
+  }
+  return hash3(x, y, z) < 0.25 ? BLOCK_IDS.stoneDark : BLOCK_IDS.stone;
 }

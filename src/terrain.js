@@ -1,67 +1,69 @@
 import { createNoise2D } from 'simplex-noise';
-import { SIZE, HALF } from './config.js';
-import { random } from './random.js';
+import { WORLD_HEIGHT } from './config.js';
+import { setSeed, random } from './random.js';
 
-// Builds a fresh heightmap using ridged + low-freq mountain mask + hills +
-// detail + negative-basin noise. Returns:
-//   heightMap : Int16Array of length SIZE*SIZE, indexed `x * SIZE + z`
-//   h(x, z)   : bounds-safe getter (-1 if outside the world)
-//   heightAt  : the raw continuous function, in case caller wants it
-export function createTerrain() {
-  // All 4 noise instances pull from the shared seeded PRNG, so the same
-  // seed always yields the same terrain.
-  const noiseA = createNoise2D(random);
-  const noiseB = createNoise2D(random);
-  const noiseC = createNoise2D(random);
-  const noiseD = createNoise2D(random);
+// Unbounded, continent-scale terrain. There is no island dome or border
+// falloff anymore — the height function is defined for every (x, z), and
+// chunks sample it on demand:
+//
+//   continentalness  3-octave very-low-freq noise → oceans vs landmass
+//   base elevation   ocean floor (~3) rising to coastal plains (~14)
+//   mountains        ridged noise² gated by a mask, only well inland
+//   hills + detail   rolling terrain and per-block jitter
+//   basins           negative dips that carve inland lakes
+//
+// A separate forest field drives tree density (clustered woods instead of
+// uniform scatter). Same seed → same planet.
+
+function smoothstep(a, b, x) {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+export function createTerrain(seed) {
+  setSeed(seed);
+  // Consumed from the seeded PRNG in fixed order — deterministic per seed.
+  const nRidge = createNoise2D(random);
+  const nMask = createNoise2D(random);
+  const nHill = createNoise2D(random);
+  const nDetail = createNoise2D(random);
+  const nCont = createNoise2D(random);
 
   function heightAt(x, z) {
-    // Soft continent dome — outer edges sink toward water. Bigger landmass.
-    const distFromCenter = Math.sqrt(x * x + z * z) / HALF;
-    const continent = Math.max(0, 1 - distFromCenter * 0.55);
+    // Continentalness: ~600-block-wavelength landmasses with ocean between
+    let c = nCont(x * 0.0016, z * 0.0016)
+          + 0.50 * nCont(x * 0.0032 + 71, z * 0.0032 - 19)
+          + 0.25 * nCont(x * 0.0064 - 133, z * 0.0064 + 57);
+    c /= 1.75;
+    const land = smoothstep(-0.22, 0.18, c);
 
-    // Ridged noise gives sharp mountain spines. Square (not cube) so ridges
-    // sit higher more of the time.
-    const r = noiseA(x * 0.011, z * 0.011);
+    let h = 3 + land * 11; // ocean floor → coastal plains
+
+    // Mountain ranges: ridged spines, gated to appear only well inland
+    const maskRaw = (nMask(x * 0.004 + 17, z * 0.004 - 41) + 1) * 0.5;
+    const mountains = smoothstep(0.35, 0.8, land) * Math.pow(maskRaw, 1.15);
+    const r = nRidge(x * 0.009, z * 0.009);
     const ridge = Math.pow(1 - Math.abs(r), 2);
+    const r2 = nRidge(x * 0.02 - 88, z * 0.02 + 130);
+    const ridge2 = Math.pow(1 - Math.abs(r2), 3) * 16;
+    h += (ridge * 58 + ridge2) * mountains;
 
-    // Mountain mask gates where mountains appear — flatter exponent so
-    // mountainous regions are more common.
-    const maskRaw = (noiseB(x * 0.0055 + 17, z * 0.0055 - 41) + 1) * 0.5;
-    const mask = Math.pow(maskRaw, 0.9);
-    const mountainHeight = ridge * mask * 60;
+    // Rolling hills (damped over the ocean) + fine detail
+    h += nHill(x * 0.025, z * 0.025) * 5 * (0.3 + 0.7 * land);
+    h += nDetail(x * 0.11, z * 0.11) * 1.5;
 
-    // Secondary higher-frequency peaks add asymmetry on the slopes.
-    const r2 = noiseA(x * 0.022 - 88, z * 0.022 + 130);
-    const ridge2 = Math.pow(1 - Math.abs(r2), 3) * mask * 16;
+    // Inland lake basins
+    const b = nMask(x * 0.013 - 200, z * 0.013 + 350);
+    if (b < -0.25) h += (b + 0.25) * 20 * land;
 
-    // Rolling hills + fine detail.
-    const hills = noiseC(x * 0.028, z * 0.028) * 6;
-    const detail = noiseD(x * 0.12, z * 0.12) * 1.4;
-
-    // Basin field — strong negative bumps carve out lakes, but only where
-    // the noise dips well below zero so lakes don't dominate the map.
-    const basinNoise = noiseB(x * 0.017 - 200, z * 0.017 + 350);
-    const basin = basinNoise < -0.2 ? (basinNoise + 0.2) * 22 : 0;
-
-    let h = 10 + (mountainHeight + ridge2) * continent + hills + detail + basin;
-    // Extra dip near borders so water leaks out toward the edges.
-    h -= Math.max(0, distFromCenter - 0.85) * 28;
-
-    return Math.max(1, Math.floor(h));
+    return Math.max(1, Math.min(WORLD_HEIGHT - 3, Math.floor(h)));
   }
 
-  const heightMap = new Int16Array(SIZE * SIZE);
-  for (let x = 0; x < SIZE; x++) {
-    for (let z = 0; z < SIZE; z++) {
-      heightMap[x * SIZE + z] = heightAt(x - HALF, z - HALF);
-    }
+  // 0..1 forest density field — woods cluster instead of uniform scatter.
+  function forestAt(x, z) {
+    const f = (nCont(x * 0.005 + 555, z * 0.005 + 888) + 1) * 0.5;
+    return smoothstep(0.35, 0.75, f);
   }
 
-  function h(x, z) {
-    if (x < 0 || x >= SIZE || z < 0 || z >= SIZE) return -1;
-    return heightMap[x * SIZE + z];
-  }
-
-  return { heightMap, h, heightAt };
+  return { heightAt, forestAt };
 }
