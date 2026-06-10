@@ -26,7 +26,7 @@ const DATA_BUDGET = 3;   // chunk fills per frame (after initial pregen)
 const MESH_BUDGET = 2;   // chunk meshes per frame
 const DATA_CACHE_MAX = 2500;
 
-export function createWorld(seed, scene) {
+export function createWorld(seed, scene, savedEdits = null) {
   const terrain = createTerrain(seed);
   const water = createWaterMaterial();
   const group = new THREE.Group();
@@ -36,6 +36,32 @@ export function createWorld(seed, scene) {
   const chunks = new Map(); // "cx,cz" → chunk record
   const key = (cx, cz) => cx + ',' + cz;
   const idx = (lx, y, lz) => (lx * CHUNK + lz) * WORLD_HEIGHT + y;
+
+  // Authoritative edit overlay, independent of the chunk cache: chunkKey →
+  // Map("x,y,z" → id). Edits reapply whenever a chunk's data regenerates,
+  // and exportEdits() flattens them for the save file.
+  const edits = new Map();
+  function recordEdit(x, y, z, id) {
+    const ck = key(Math.floor(x / CHUNK), Math.floor(z / CHUNK));
+    let m = edits.get(ck);
+    if (!m) edits.set(ck, (m = new Map()));
+    m.set(x + ',' + y + ',' + z, id);
+  }
+  if (savedEdits) {
+    for (const [cell, id] of Object.entries(savedEdits)) {
+      const [x, y, z] = cell.split(',').map(Number);
+      recordEdit(x, y, z, id);
+    }
+  }
+  let editsVersion = 0; // bumped on every set() — autosave dirty check
+
+  function exportEdits() {
+    const out = {};
+    for (const m of edits.values()) {
+      for (const [cell, id] of m) out[cell] = id;
+    }
+    return out;
+  }
 
   // ---- data generation -------------------------------------------------
 
@@ -78,6 +104,17 @@ export function createWorld(seed, scene) {
       }
     }
 
+    // Re-apply saved/recorded edits on top of the generated data
+    const m = edits.get(key(cx, cz));
+    if (m) {
+      for (const [cell, id] of m) {
+        const [x, y, z] = cell.split(',').map(Number);
+        const lx = x - x0, lz = z - z0;
+        data[idx(lx, y, lz)] = id;
+        if (id !== AIR && y > colMax[lx * CHUNK + lz]) colMax[lx * CHUNK + lz] = y;
+      }
+    }
+
     chunks.set(key(cx, cz), chunk);
     return chunk;
   }
@@ -101,6 +138,8 @@ export function createWorld(seed, scene) {
     c.data[idx(lx, y, lz)] = id;
     c.edited = true;
     if (id !== AIR && y > c.colMax[lx * CHUNK + lz]) c.colMax[lx * CHUNK + lz] = y;
+    recordEdit(x, y, z, id);
+    editsVersion++;
   }
 
   // Original terrain surface (ignores edits) — water & swim checks.
@@ -210,10 +249,11 @@ export function createWorld(seed, scene) {
       if (d > renderDist + 1) unmeshChunk(c);
     }
 
-    // 4) Evict far, untouched data if the cache balloons
+    // 4) Evict far data if the cache balloons (edits live in the overlay,
+    //    so even edited chunks regenerate faithfully)
     if (chunks.size > DATA_CACHE_MAX) {
       for (const [k, c] of chunks) {
-        if (c.edited || c.solidMesh || c.waterMesh) continue;
+        if (c.solidMesh || c.waterMesh) continue;
         const d = Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz));
         if (d > renderDist * 3) chunks.delete(k);
       }
@@ -252,6 +292,8 @@ export function createWorld(seed, scene) {
     get, set, surfaceAt, remeshAt,
     update, pregenerate, findSpawn, dispose,
     water, terrain, group,
+    exportEdits,
+    get editsVersion() { return editsVersion; },
     get renderDist() { return renderDist; },
     setRenderDist(n) { renderDist = Math.max(2, Math.min(12, n | 0)); },
     get chunkCount() { return chunks.size; },

@@ -184,9 +184,14 @@ src/
 └── shaders.js       shared GLSL noise chunk
 ```
 
-> Block edits live in the in-memory chunk cache — they survive walking
-> away and back, but only the seed is saved, so a reload regenerates
-> the pristine world.
+## Saving
+
+The game autosaves to `localStorage` every couple of seconds and on tab
+close. Terrain regenerates deterministically from the seed, so the save
+only carries your delta: every block you've dug or placed (an edit
+overlay, re-applied whenever a chunk regenerates), your position, view
+direction and flight state, plus the time of day and weather —
+"Continue" drops you exactly where you left off.
 
 ## Tech stack
 

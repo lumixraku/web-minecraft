@@ -42,23 +42,66 @@ const gameConsole = createConsole({
   requestLock: lockPointer,
 });
 
-function generateForSeed(seed) {
+// Build (or rebuild) the world from a save: { seed, edits?, player?,
+// time?, weather? }. Restores the previous session's position, view,
+// flight state, time of day and weather when present.
+function generateFromSave(save) {
   loading.style.display = 'flex';
   // Defer one frame so the loading screen paints before the synchronous
   // pre-generation of the chunks around spawn.
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       if (world) world.dispose();
-      world = createWorld(seed, scene);
-      const spawn = world.findSpawn();
-      world.pregenerate(spawn.x, spawn.z);
+      world = createWorld(save.seed, scene, save.edits || null);
+      const center = save.player || world.findSpawn();
+      world.pregenerate(center.x, center.z);
       player.setWorld(world);
-      player.spawn(spawn);
+      if (save.player) player.restore(save.player);
+      else player.spawn(center);
+      if (typeof save.time === 'number') sky.setTimeOfDay(save.time);
+      if (save.weather) weather.setState(save.weather);
       loading.style.display = 'none';
       resolve();
     });
   });
 }
+
+// ---- autosave ----
+let lastSavedEdits = -1;
+let lastSavedAt = 0;
+
+function persist() {
+  if (!world) return;
+  saveWorld({
+    seed: world.seed,
+    time: sky.timeOfDay,
+    weather: weather.state,
+    player: {
+      x: player.position.x,
+      y: player.position.y,
+      z: player.position.z,
+      yaw: camera.rotation.y,
+      pitch: camera.rotation.x,
+      flying: player.flying,
+    },
+    edits: world.exportEdits(),
+  });
+  lastSavedEdits = world.editsVersion;
+  lastSavedAt = performance.now();
+}
+
+// Save every few seconds while playing, and on the way out.
+setInterval(() => {
+  if (!world) return;
+  // Always cheap; skip only if nothing happened very recently
+  if (world.editsVersion !== lastSavedEdits || performance.now() - lastSavedAt > 5000) {
+    persist();
+  }
+}, 2000);
+window.addEventListener('pagehide', persist);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') persist();
+});
 
 const menu = createMenu({
   peekSave: () => loadWorld(),
@@ -66,15 +109,15 @@ const menu = createMenu({
   onContinue: async () => {
     const save = loadWorld();
     if (!save) return;
-    await generateForSeed(save.seed);
+    await generateFromSave(save);
     menu.setWorldLoaded(save.seed);
     menu.hide();
     lockPointer();
   },
   onNew: async () => {
     const seed = newSeed();
-    saveWorld(seed);
-    await generateForSeed(seed);
+    saveWorld({ seed });
+    await generateFromSave({ seed });
     menu.setWorldLoaded(seed);
     menu.hide();
     lockPointer();

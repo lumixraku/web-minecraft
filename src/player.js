@@ -145,6 +145,13 @@ export function createPlayer(camera) {
     camera.position.set(pos.x, pos.y + PLAYER.eye, pos.z);
   }
 
+  // Restore a saved session: position, view direction, flight state.
+  function restore(state) {
+    teleport(state.x, state.y, state.z);
+    camera.rotation.set(state.pitch || 0, state.yaw || 0, 0);
+    flying = !!state.flying;
+  }
+
   function getAABB() {
     const r = PLAYER.width / 2;
     return {
@@ -157,6 +164,7 @@ export function createPlayer(camera) {
     update,
     spawn,
     teleport,
+    restore,
     setWorld(w) { world = w; },
     setEnabled(on) { enabled = on; if (!on) keys.clear(); },
     toggleFly() { flying = !flying; vel.y = 0; return flying; },
