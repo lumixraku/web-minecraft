@@ -50,6 +50,14 @@ const FRAG = /* glsl */ `
     col = mix(col, duskCol, uDuskF * pow(sunAmount, 3.0) * (1.0 - abs(h)));
     col += duskCol * uDuskF * pow(max(1.0 - abs(h), 0.0), 6.0) * 0.35;
 
+    // Twilight wash — the whole lower sky soaks in warm haze while the
+    // zenith stays dark, with a magenta band in between (the reference
+    // look: dusk fills the sky, not just the sun's corner)
+    vec3 duskMid = vec3(0.46, 0.22, 0.26);
+    float wash = uDuskF * pow(clamp(1.0 - h, 0.0, 1.0), 1.9);
+    col = mix(col, duskCol * 0.50 + duskMid * 0.50, wash * 0.50);
+    col = mix(col, duskMid, uDuskF * pow(clamp(1.0 - abs(h - 0.25), 0.0, 1.0), 5.0) * 0.30);
+
     // Sun disc + glow
     float sunDisc = smoothstep(0.99955, 0.99985, sunAmount);
     float sunGlow = pow(sunAmount, 180.0) * 0.5 + pow(sunAmount, 12.0) * 0.12;
@@ -198,12 +206,17 @@ export function createSky(scene) {
     }
     dirLight.target.updateMatrixWorld();
 
-    ambient.intensity = (0.18 + 0.68 * dayF) * (1 - storm * 0.35) + weather.flash * 1.4;
-    hemi.intensity = 0.08 + 0.28 * dayF;
+    // Steeper falloff toward dusk so terrain sinks into silhouette while
+    // the sky still glows (the reference's near-black dusk landscapes)
+    ambient.intensity = (0.15 + 0.71 * Math.pow(dayF, 1.5)) * (1 - storm * 0.35)
+      + weather.flash * 1.4;
+    hemi.intensity = 0.06 + 0.30 * Math.pow(dayF, 1.4);
 
     // --- fog tracks the horizon color + weather density ---
+    // Aerial perspective: distant terrain melts into the twilight, so the
+    // dusk component is strong (matches the sky's lower-hemisphere wash)
     out.fogColor.copy(NIGHT_HOR).lerp(DAY_HOR, dayF);
-    out.fogColor.lerp(DUSK, duskF * 0.3);
+    out.fogColor.lerp(DUSK, duskF * 0.55);
     const gray = STORM_GRAY.clone().multiplyScalar(0.25 + dayF * 0.75);
     out.fogColor.lerp(gray, storm * 0.7);
     scene.fog.color.copy(out.fogColor);
