@@ -1,77 +1,43 @@
 import * as THREE from 'three';
-import { HALF } from './config.js';
-import {
-  blockGeom,
-  waterGeom,
-  M,
-  PLANAR_TYPES,
-  TRANSPARENT_TYPES,
-} from './materials.js';
-import { setSeed } from './random.js';
-import { createTerrain } from './terrain.js';
-import { collectSolidBlocks } from './blocks.js';
-import { generateWater } from './features/water.js';
-import { generateTrees } from './features/trees.js';
-import { generateClouds } from './features/clouds.js';
+import { HALF, SEA_LEVEL, SNOW_LEVEL } from './config.js';
+import { createVoxels } from './voxels.js';
+import { createChunkedMesh } from './chunks.js';
+import { createWater } from './water.js';
 
-// Build a complete world for the given seed: terrain, water, trees, clouds.
-// Returns a Group of InstancedMeshes. Same seed → same world (the PRNG is
-// reseeded here, and every generator consumes random() in a fixed order).
-export function buildWorld(seed) {
-  setSeed(seed);
-  const terrain = createTerrain();
-
-  const sources = [
-    // [blocks, mode]   mode = 'grid' shifts by -HALF, 'world' leaves as-is
-    [collectSolidBlocks(terrain.heightMap, terrain.h), 'grid'],
-    [generateTrees(terrain.heightMap, terrain.h),      'grid'],
-    [generateWater(terrain.heightMap),                 'grid'],
-    [generateClouds(),                                 'world'],
-  ];
-
-  // Bucket by block type → list of [x,y,z]
-  const groups = {};
-  for (const [list, mode] of sources) {
-    for (const b of list) {
-      const shift = mode === 'grid' ? HALF : 0;
-      (groups[b.type] ||= []).push([b.x - shift, b.y, b.z - shift]);
-    }
-  }
+// Build a complete world for a seed: voxel field → chunked meshes + shader
+// water, plus a spawn point. Same seed → same world.
+export function createWorld(seed) {
+  const vox = createVoxels(seed);
+  const chunks = createChunkedMesh(vox);
+  const water = createWater(vox.heightMap);
 
   const group = new THREE.Group();
-  const dummy = new THREE.Object3D();
+  group.add(chunks.group, water.mesh);
 
-  for (const type in groups) {
-    const positions = groups[type];
-    if (!M[type]) {
-      console.warn(`No material registered for block type "${type}", skipping`);
-      continue;
+  // Spawn on the land column nearest the world center (dry, below the snow
+  // line so the player starts somewhere green).
+  let spawn = null;
+  outer:
+  for (let r = 0; r < HALF && !spawn; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const gx = HALF + dx, gz = HALF + dz;
+        const s = vox.h(gx, gz);
+        if (s > SEA_LEVEL + 1 && s < SNOW_LEVEL) {
+          spawn = new THREE.Vector3(gx - HALF + 0.5, s + 1, gz - HALF + 0.5);
+          break outer;
+        }
+      }
     }
-    const isPlanar = PLANAR_TYPES.has(type);
-    const isTransparent = TRANSPARENT_TYPES.has(type);
-    const geom = isPlanar ? waterGeom : blockGeom;
+  }
+  spawn ||= new THREE.Vector3(0.5, 50, 0.5);
 
-    const mesh = new THREE.InstancedMesh(geom, M[type], positions.length);
-    mesh.castShadow = !isTransparent;
-    mesh.receiveShadow = !isTransparent || type === 'water';
-    if (isTransparent) mesh.renderOrder = type === 'cloud' ? 1 : 2;
-
-    for (let i = 0; i < positions.length; i++) {
-      const [x, y, z] = positions[i];
-      dummy.position.set(x, y, z);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    group.add(mesh);
+  function dispose() {
+    chunks.dispose();
+    water.dispose();
+    if (group.parent) group.parent.remove(group);
   }
 
-  return group;
-}
-
-export function disposeWorld(group) {
-  group.traverse((obj) => {
-    if (obj.isInstancedMesh && obj.dispose) obj.dispose();
-  });
-  if (group.parent) group.parent.remove(group);
+  return { vox, chunks, water, group, spawn, h: vox.h, dispose };
 }

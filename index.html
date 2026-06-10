@@ -38,7 +38,82 @@
       text-shadow: 2px 2px 0 #000;
       pointer-events: none;
     }
-    body.menu-open #hud { display: none; }
+    body.menu-open #hud,
+    body.menu-open #crosshair,
+    body.menu-open #hotbar,
+    body.menu-open #status { display: none; }
+
+    /* Crosshair */
+    #crosshair {
+      position: fixed; left: 50%; top: 50%;
+      width: 18px; height: 18px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      mix-blend-mode: difference;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: #fff;
+    }
+    #crosshair::before {
+      left: 50%; top: 0; width: 2px; height: 100%;
+      transform: translateX(-50%);
+    }
+    #crosshair::after {
+      top: 50%; left: 0; height: 2px; width: 100%;
+      transform: translateY(-50%);
+    }
+
+    /* Hotbar */
+    #hotbar {
+      position: fixed; bottom: 10px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 2px;
+      padding: 3px;
+      background: rgba(0, 0, 0, 0.35);
+      outline: 2px solid rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+    #hotbar .slot {
+      position: relative;
+      width: 44px; height: 44px;
+      background: var(--mc-stone-mid);
+      box-shadow:
+        inset 2px 2px 0 var(--mc-stone-lo),
+        inset -2px -2px 0 var(--mc-stone-hi);
+    }
+    #hotbar .slot.selected {
+      outline: 3px solid #fff;
+      z-index: 1;
+    }
+    #hotbar .swatch {
+      position: absolute; inset: 8px;
+      box-shadow:
+        inset 3px 3px 0 rgba(255, 255, 255, 0.35),
+        inset -3px -3px 0 rgba(0, 0, 0, 0.3);
+    }
+    #hotbar .num {
+      position: absolute; top: 2px; left: 3px;
+      font-size: 7px; color: #fff;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    /* Time + weather, top right */
+    #status {
+      position: fixed; top: 12px; right: 12px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px; letter-spacing: 1px;
+      color: #fff;
+      text-shadow: 2px 2px 0 #000;
+      pointer-events: none;
+    }
+
+    /* Underwater tint */
+    #underwater {
+      position: fixed; inset: 0;
+      background: rgba(12, 60, 110, 0.35);
+      opacity: 0; transition: opacity 0.25s;
+      pointer-events: none;
+    }
 
     /* Loading splash */
     #loading {
@@ -198,8 +273,13 @@
   <canvas id="app"></canvas>
 
   <div id="hud">
-    Drag · Scroll · Right-drag &nbsp;|&nbsp; ESC for menu
+    WASD move · Space jump · Shift sprint · F fly<br>
+    L-click dig · R-click place · R weather · T fast time · ESC menu
   </div>
+  <div id="crosshair"></div>
+  <div id="hotbar"></div>
+  <div id="status"></div>
+  <div id="underwater"></div>
 
   <div id="loading">GENERATING TERRAIN…</div>
 
