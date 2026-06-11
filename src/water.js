@@ -81,6 +81,13 @@ const FRAG = /* glsl */ `
     float ndh = max(dot(nrm, H), 0.0);
     col += uLightCol * (pow(ndh, 140.0) * 0.5 + pow(ndh, 14.0) * 0.12);
 
+    // Crisp mirrored sun / moon disc. The planar texture alone loses it
+    // when the light is high (steep view → fresnel ≈ 0), so reflect the
+    // view ray off the rippled surface and match it against the light.
+    vec3 R = reflect(-V, nrm);
+    float rd = max(dot(R, uLightDir), 0.0);
+    col += uLightCol * smoothstep(0.9990, 0.99985, rd) * (0.3 + 1.2 * fres);
+
     float alpha = mix(0.60, 0.86, dT) + fres * 0.14;
 
     float fd = length(cameraPosition - vW);
@@ -120,7 +127,9 @@ export function createWaterMaterial() {
   // The whole world shares one water plane (y = WATER_Y), so a single
   // mirrored render serves every chunk. Rendered at quarter resolution —
   // the ripple distortion and the soft painterly look hide the difference.
-  const reflTarget = new THREE.WebGLRenderTarget(1, 1);
+  // Half-float so the sun / moon discs keep their HDR brightness — in an
+  // 8-bit target they clamp to 1.0 and vanish into the bright horizon sky.
+  const reflTarget = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
   uniforms.uReflTex.value = reflTarget.texture;
 
   const virtualCamera = new THREE.PerspectiveCamera();
@@ -130,7 +139,11 @@ export function createWaterMaterial() {
   const dir = new THREE.Vector3();
   const bufSize = new THREE.Vector2();
   const UP = new THREE.Vector3(0, 1, 0);
-  const CLIP_BIAS = 0.05;
+  // No bias: the offset scales with depth, so even a small value carves a
+  // visible wedge out of the reflected sky at the dome's distance (it cut
+  // the bottom off the low sun's reflection). The water itself is hidden
+  // during the reflection pass, so there is nothing to z-fight with.
+  const CLIP_BIAS = 0.0;
 
   // Renders the scene from a camera mirrored about the water plane into
   // reflTarget. Call once per frame, before the main render.
