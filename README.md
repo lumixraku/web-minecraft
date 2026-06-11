@@ -5,6 +5,8 @@ no bundler, no build step, just ES modules and an import map. A continent-scale
 world streams in around you chunk by chunk, with a full day/night cycle,
 dynamic weather, and shader-driven sky, clouds and water.
 
+<video src="docs/screenshots/demo.mp4" autoplay loop muted playsinline></video>
+
 ![Sunset](docs/screenshots/sunset.jpg)
 
 | | |
