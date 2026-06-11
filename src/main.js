@@ -17,7 +17,7 @@ const canvas = document.getElementById('app');
 const loading = document.getElementById('loading');
 const underwaterEl = document.getElementById('underwater');
 
-const { scene, camera, composer } = createScene(canvas);
+const { scene, camera, composer, renderer } = createScene(canvas);
 const sky = createSky(scene);
 const clouds = createClouds(scene);
 const weather = createWeather(scene);
@@ -197,6 +197,7 @@ function tick() {
   }
   debug.update(dt);
 
+  if (world) world.water.renderReflection(renderer, scene, camera);
   composer.render();
   requestAnimationFrame(tick);
 }
