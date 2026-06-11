@@ -80,7 +80,7 @@ export function createPlayer(camera) {
     const r = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
     const yaw = camera.rotation.y;
     let mx = f * -Math.sin(yaw) + r * Math.cos(yaw);
-    let mz = f * -Math.cos(yaw) + r * Math.sin(yaw);
+    let mz = f * -Math.cos(yaw) - r * Math.sin(yaw);
     const len = Math.hypot(mx, mz);
     if (len > 0) { mx /= len; mz /= len; }
 

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { CHUNK } from './config.js';
 import { createScene } from './scene.js';
 import { createWorld } from './world.js';
 import { loadWorld, saveWorld } from './storage.js';
@@ -18,7 +17,7 @@ const canvas = document.getElementById('app');
 const loading = document.getElementById('loading');
 const underwaterEl = document.getElementById('underwater');
 
-const { scene, camera, renderer } = createScene(canvas);
+const { scene, camera, composer } = createScene(canvas);
 const sky = createSky(scene);
 const clouds = createClouds(scene);
 const weather = createWeather(scene);
@@ -176,15 +175,7 @@ function tick() {
 
   player.update(dt);
   const w = weather.update(dt, camera, sky.out.dayF);
-  let fogBase;
-  if (world) {
-    fogBase = world.renderDist * CHUNK;
-    // Creative flight: the higher you climb, the further the fog opens up,
-    // so flying high gives an aerial vista instead of a wall of haze.
-    const alt = Math.max(0, camera.position.y - 50);
-    fogBase *= 1 + Math.min(1, alt / 80) * 1.8;
-  }
-  sky.update(dt, w, camera, fogBase);
+  sky.update(dt, w, camera);
   clouds.update(dt, w, sky, camera);
 
   if (world) {
@@ -206,7 +197,7 @@ function tick() {
   }
   debug.update(dt);
 
-  renderer.render(scene, camera);
+  composer.render();
   requestAnimationFrame(tick);
 }
 tick();
