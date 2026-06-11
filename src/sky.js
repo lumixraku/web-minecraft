@@ -171,9 +171,7 @@ export function createSky(scene) {
     flash: 0,
   };
 
-  // fogBase: clear-weather fog distance — tracks the world's render
-  // distance so the chunk edge always hides inside the haze.
-  function update(dt, weather, camera, fogBase = RENDER_DIST * CHUNK) {
+  function update(dt, weather, camera) {
     elapsed += dt;
     timeOfDay = (timeOfDay + (dt * timeScale) / DAY_LENGTH) % 1;
 
@@ -216,18 +214,16 @@ export function createSky(scene) {
       + weather.flash * 1.4;
     hemi.intensity = 0.06 + 0.30 * Math.pow(dayF, 1.4);
 
-    // --- fog tracks the horizon color + weather density ---
-    // Aerial perspective: distant terrain melts into the twilight, so the
-    // dusk component is strong (matches the sky's lower-hemisphere wash)
+    // --- horizon / haze color (still drives cloud haze + water reflection) ---
     out.fogColor.copy(NIGHT_HOR).lerp(DAY_HOR, dayF);
     out.fogColor.lerp(DUSK, duskF * 0.65);
     const gray = STORM_GRAY.clone().multiplyScalar(0.25 + dayF * 0.75);
     out.fogColor.lerp(gray, storm * 0.7);
-    // Fog only exists to dissolve the chunk-loading edge — keep it as a
-    // steep band near the far limit instead of a wash over the midground.
-    scene.fog.color.copy(out.fogColor);
-    scene.fog.far = fogBase * weather.fog;
-    scene.fog.near = scene.fog.far * 0.75;
+    // Distance fog disabled — no whitening on distant terrain. scene.fog is
+    // kept pushed out of view above water; the underwater murk in main.js
+    // overrides near/far while the head is submerged.
+    scene.fog.near = 1e6;
+    scene.fog.far = 1e7;
 
     // Water reflection tint — like the fog color but keeps the dusk glow,
     // so sunset paints the lakes orange instead of leaving them dark.
