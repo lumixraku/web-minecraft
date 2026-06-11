@@ -285,6 +285,7 @@ export function createWorld(seed, scene, savedEdits = null) {
     chunks.clear();
     scene.remove(group);
     water.material.dispose();
+    water.dispose();
   }
 
   return {
