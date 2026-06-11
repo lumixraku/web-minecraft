@@ -16,7 +16,7 @@ export const TREE_CHANCE = 0.012; // per-column tree probability (× forest fact
 export const CLOUD_Y = 85;        // shader cloud layer altitude
 
 // Day / night
-export const DAY_LENGTH = 240;   // seconds for a full day cycle
+export const DAY_LENGTH = 86400; // seconds for a full day cycle (real time: 1 in-game day = 24 real hours)
 
 // Player physics
 export const PLAYER = {
